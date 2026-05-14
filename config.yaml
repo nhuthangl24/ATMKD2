@@ -1,0 +1,54 @@
+# =====================================================
+# WiFi Security Monitor - Cau hinh chinh
+# =====================================================
+
+# Ten interface o monitor mode (chay: sudo airmon-ng start wlan1 -> wlan1mon)
+interface: wlan1mon
+
+# Duong dan file
+whitelist_path: config/whitelist.json
+log_path: logs/wifi_alerts.jsonl
+
+# -----------------------------------------------
+# Scan settings
+# -----------------------------------------------
+# true  = hien menu chon AP muc tieu truoc khi sniff
+# false = quet tat ca AP khong can chon
+interactive_scan: true
+scan_seconds: 10        # Thoi gian quet de build danh sach AP
+scan_max_results: 20    # So AP toi da hien trong menu
+
+# -----------------------------------------------
+# Rogue AP / Evil Twin detection
+# -----------------------------------------------
+# Do tuong dong SSID de canh bao (0.0 - 1.0)
+# 0.85 = bat SSID giong >= 85% (vi du: "Lab-WiFi" vs "Lab_WiFi")
+ssid_similarity_threshold: 0.85
+
+# Khong lap alert cung SSID trong bao nhieu giay
+alert_cooldown_seconds: 30
+
+# -----------------------------------------------
+# Deauthentication Attack detection
+# -----------------------------------------------
+deauth_window_seconds: 10   # Cua so thoi gian dem frame
+deauth_threshold: 20        # So frame trong cua so -> trigger alert
+
+# -----------------------------------------------
+# OpenSearch (Dashboard) - tat mac dinh
+# -----------------------------------------------
+opensearch:
+  enabled: false
+  endpoint: http://localhost:9200
+  index: wifi-security-logs
+  verify_tls: false
+  username: admin
+  password: admin
+
+# -----------------------------------------------
+# Telegram Alert - tat mac dinh
+# -----------------------------------------------
+telegram:
+  enabled: false
+  bot_token: "NHAP_BOT_TOKEN"
+  chat_id: "NHAP_CHAT_ID"

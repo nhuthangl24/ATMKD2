@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiFi Security Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;800&display=swap');
+
+  :root {
+    --bg:        #060b14;
+    --bg2:       #0c1524;
+    --bg3:       #111e30;
+    --border:    #1a3050;
+    --accent:    #00d4ff;
+    --accent2:   #0077ff;
+    --danger:    #ff3b5c;
+    --warn:      #ffaa00;
+    --ok:        #00e676;
+    --text:      #c8dff0;
+    --muted:     #4a6880;
+    --mono:      'Share Tech Mono', monospace;
+    --sans:      'Exo 2', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+
+  /* Scanlines overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ---- Header ---- */
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-shadow: 0 0 12px var(--accent);
+  }
+  header h1 span { color: var(--muted); }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 0.8rem;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--muted);
+    box-shadow: none;
+    transition: all .3s;
+  }
+  .dot.active {
+    background: var(--ok);
+    box-shadow: 0 0 8px var(--ok);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: .5; }
+  }
+
+  /* ---- Layout ---- */
+  .layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+    height: calc(100vh - 56px);
+  }
+
+  .sidebar {
+    grid-row: 1 / 3;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  .main-top {
+    padding: 20px 24px 0;
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+
+  .main-content {
+    padding: 16px 24px 24px;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* ---- Cards ---- */
+  .card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .card-title {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* ---- Stat boxes ---- */
+  .stat-box {
+    flex: 1; min-width: 130px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+  .stat-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 2rem;
+    color: var(--accent);
+    text-shadow: 0 0 10px rgba(0,212,255,0.4);
+  }
+  .stat-value.danger { color: var(--danger); text-shadow: 0 0 10px rgba(255,59,92,.4); }
+  .stat-value.warn   { color: var(--warn);   text-shadow: 0 0 10px rgba(255,170,0,.4); }
+  .stat-value.ok     { color: var(--ok);     text-shadow: 0 0 10px rgba(0,230,118,.4); }
+
+  /* ---- Buttons ---- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px;
+    border: 1px solid;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all .2s;
+    background: transparent;
+    letter-spacing: 1px;
+  }
+  .btn-primary {
+    color: var(--accent); border-color: var(--accent2);
+  }
+  .btn-primary:hover {
+    background: rgba(0,119,255,.15);
+    box-shadow: 0 0 12px rgba(0,212,255,.3);
+  }
+  .btn-danger {
+    color: var(--danger); border-color: var(--danger);
+  }
+  .btn-danger:hover { background: rgba(255,59,92,.12); }
+  .btn-ok {
+    color: var(--ok); border-color: var(--ok);
+  }
+  .btn-ok:hover { background: rgba(0,230,118,.1); }
+  .btn-warn {
+    color: var(--warn); border-color: var(--warn);
+  }
+  .btn-warn:hover { background: rgba(255,170,0,.1); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---- AP Table ---- */
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th {
+    text-align: left;
+    padding: 7px 10px;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 8px 10px; border-bottom: 1px solid rgba(26,48,80,.5); }
+  tr:hover td { background: rgba(0,212,255,.04); }
+  tr.selected td { background: rgba(0,119,255,.1); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+  }
+  .badge-ok     { background: rgba(0,230,118,.15); color: var(--ok); }
+  .badge-danger { background: rgba(255,59,92,.15);  color: var(--danger); }
+  .badge-warn   { background: rgba(255,170,0,.15);  color: var(--warn); }
+  .badge-info   { background: rgba(0,212,255,.12);  color: var(--accent); }
+
+  /* ---- Alert feed ---- */
+  .alert-item {
+    border-left: 3px solid var(--border);
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    background: var(--bg2);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.82rem;
+    animation: slideIn .3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity:0; transform: translateX(-10px); }
+    to   { opacity:1; transform: translateX(0); }
+  }
+  .alert-item.rogue  { border-left-color: var(--danger); }
+  .alert-item.deauth { border-left-color: var(--warn); }
+  .alert-header {
+    display: flex; justify-content: space-between;
+    margin-bottom: 5px;
+  }
+  .alert-type {
+    font-family: var(--mono); font-weight: 600;
+    font-size: 0.8rem;
+  }
+  .alert-time {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .alert-details { color: var(--text); line-height: 1.5; }
+  .mono { font-family: var(--mono); color: var(--accent); }
+
+  /* ---- Form inputs ---- */
+  input, select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    width: 100%;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent2);
+    box-shadow: 0 0 8px rgba(0,119,255,.2);
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .form-grid .full { grid-column: 1/-1; }
+  label { font-size: 0.75rem; color: var(--muted); display: block; margin-bottom: 3px; }
+
+  /* ---- Whitelist items ---- */
+  .wl-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 6px;
+    background: var(--bg);
+    font-size: 0.82rem;
+  }
+  .wl-ssid { font-weight: 600; color: var(--ok); }
+  .wl-bssid { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+  .wl-del {
+    background: none; border: none;
+    color: var(--danger); cursor: pointer;
+    font-size: 1rem; padding: 2px 6px;
+    opacity: .6; transition: opacity .2s;
+  }
+  .wl-del:hover { opacity: 1; }
+
+  /* ---- Scrollbar ---- */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .empty-msg {
+    text-align: center; color: var(--muted);
+    font-family: var(--mono); font-size: 0.8rem;
+    padding: 20px;
+  }
+
+  .tab-bar {
+    display: flex; gap: 4px; margin-bottom: 12px;
+  }
+  .tab {
+    padding: 6px 16px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px 4px 0 0;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    transition: all .2s;
+  }
+  .tab.active {
+    background: var(--bg3);
+    border-bottom-color: var(--bg3);
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>▶ WIFI<span>/</span>SECURITY<span>/</span>MONITOR</h1>
+  <div class="status-pill">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">IDLE</span>
+    <span style="color:var(--muted); margin-left:8px" id="ifaceLabel"></span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+
+    <!-- Controls -->
+    <div class="card">
+      <div class="card-title">⚙ CONTROL</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button class="btn btn-warn" id="btnScan" onclick="doScan()">⟳ SCAN APs</button>
+        <button class="btn btn-ok"   id="btnStart" onclick="doStart()">▶ START MONITOR</button>
+        <button class="btn btn-danger" id="btnStop" onclick="doStop()" disabled>■ STOP</button>
+        <button class="btn btn-primary" onclick="clearLog()" style="margin-top:4px">🗑 CLEAR LOG</button>
+      </div>
+    </div>
+
+    <!-- Scan results -->
+    <div class="card" id="scanCard" style="display:none">
+      <div class="card-title">📡 DETECTED APs</div>
+      <div id="scanList"></div>
+      <div style="margin-top:10px; font-size:0.75rem; color:var(--muted); font-family:var(--mono)">
+        Click AP de chon / bo chon. Start de giam sat.
+      </div>
+    </div>
+
+    <!-- Whitelist -->
+    <div class="card">
+      <div class="card-title">✅ WHITELIST</div>
+      <div id="whitelistList"></div>
+      <div style="margin-top:12px">
+        <div class="card-title" style="margin-bottom:8px">+ THEM AP</div>
+        <div class="form-grid">
+          <div>
+            <label>SSID</label>
+            <input id="wlSsid" placeholder="Lab-WiFi">
+          </div>
+          <div>
+            <label>BSSID</label>
+            <input id="wlBssid" placeholder="AA:BB:CC:11:22:33">
+          </div>
+          <div>
+            <label>Channel</label>
+            <input id="wlChannel" type="number" placeholder="6">
+          </div>
+          <div>
+            <label>Encryption</label>
+            <select id="wlEnc">
+              <option>WPA2</option>
+              <option>WPA3</option>
+              <option>WPA</option>
+              <option>Open</option>
+            </select>
+          </div>
+          <div class="full">
+            <label>Note</label>
+            <input id="wlNote" placeholder="Mo ta (tuy chon)">
+          </div>
+        </div>
+        <button class="btn btn-ok" style="width:100%" onclick="addWhitelist()">+ THEM</button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ===== STATS ROW ===== -->
+  <div class="main-top">
+    <div class="stat-box">
+      <div class="stat-label">Beacons</div>
+      <div class="stat-value" id="statBeacons">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Deauths</div>
+      <div class="stat-value warn" id="statDeauths">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Alerts</div>
+      <div class="stat-value danger" id="statAlerts">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Rogue APs</div>
+      <div class="stat-value danger" id="statRogue">0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Deauth Attacks</div>
+      <div class="stat-value warn" id="statDeauthAtk">0</div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="main-content">
+
+    <div class="tab-bar">
+      <button class="tab active" onclick="showTab('live')">⚡ LIVE ALERTS</button>
+      <button class="tab" onclick="showTab('log')">📋 LOG FILE</button>
+    </div>
+
+    <div id="tabLive">
+      <div id="alertFeed">
+        <div class="empty-msg">Chua co alert. Bat dau monitor de theo doi realtime.</div>
+      </div>
+    </div>
+
+    <div id="tabLog" style="display:none">
+      <div style="display:flex; gap:10px; margin-bottom:12px">
+        <button class="btn btn-primary" onclick="loadLog()">⟳ TAI LOG</button>
+        <select id="logFilter" style="width:200px" onchange="loadLog()">
+          <option value="">Tat ca</option>
+          <option value="rogue_ap_detected">Rogue AP</option>
+          <option value="deauth_attack_detected">Deauth Attack</option>
+        </select>
+      </div>
+      <div id="logFeed">
+        <div class="empty-msg">Nhan "Tai log" de xem.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ============================================
+  // State
+  // ============================================
+  let selectedBssids = new Set();
+  let scannedAps = [];
+  let pollingInterval = null;
+  let lastAlertCount = 0;
+
+  // ============================================
+  // Init
+  // ============================================
+  window.onload = () => {
+    loadWhitelist();
+    pollStatus();
+    setInterval(pollStatus, 3000);
+  };
+
+  // ============================================
+  // Tab switching
+  // ============================================
+  function showTab(tab) {
+    document.getElementById('tabLive').style.display = tab === 'live' ? '' : 'none';
+    document.getElementById('tabLog').style.display  = tab === 'log'  ? '' : 'none';
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && tab === 'live') || (i === 1 && tab === 'log'));
+    });
+    if (tab === 'log') loadLog();
+  }
+
+  // ============================================
+  // Status polling
+  // ============================================
+  async function pollStatus() {
+    try {
+      const r = await fetch('/api/status');
+      const d = await r.json();
+
+      const running = d.running;
+      document.getElementById('statusDot').classList.toggle('active', running);
+      document.getElementById('statusText').textContent = running ? 'MONITORING' : 'IDLE';
+      document.getElementById('ifaceLabel').textContent = d.interface || '';
+
+      document.getElementById('btnStart').disabled = running;
+      document.getElementById('btnStop').disabled  = !running;
+
+      if (d.stats) {
+        document.getElementById('statBeacons').textContent  = d.stats.total_beacons  || 0;
+        document.getElementById('statDeauths').textContent  = d.stats.total_deauths  || 0;
+        document.getElementById('statAlerts').textContent   = d.stats.total_alerts   || 0;
+
+        const alerts = d.stats.alerts || [];
+        document.getElementById('statRogue').textContent =
+          alerts.filter(a => a.event_type === 'rogue_ap_detected').length;
+        document.getElementById('statDeauthAtk').textContent =
+          alerts.filter(a => a.event_type === 'deauth_attack_detected').length;
+
+        if (running && alerts.length !== lastAlertCount) {
+          lastAlertCount = alerts.length;
+          renderAlerts(alerts);
+        }
+      }
+    } catch(e) {
+      console.warn('Status poll failed', e);
+    }
+  }
+
+  // ============================================
+  // Scan
+  // ============================================
+  async function doScan() {
+    const btn = document.getElementById('btnScan');
+    btn.disabled = true;
+    btn.textContent = '⟳ SCANNING...';
+
+    try {
+      const r = await fetch('/api/scan', { method: 'POST' });
+      const d = await r.json();
+      scannedAps = d.aps || [];
+      selectedBssids.clear();
+      renderScanList();
+      document.getElementById('scanCard').style.display = '';
+    } catch(e) {
+      alert('Scan failed: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = '⟳ SCAN APs';
+  }
+
+  function renderScanList() {
+    const el = document.getElementById('scanList');
+    if (!scannedAps.length) {
+      el.innerHTML = '<div class="empty-msg">Khong tim thay AP</div>';
+      return;
+    }
+    el.innerHTML = scannedAps.map((ap, i) => `
+      <div class="wl-item" id="ap-${i}" onclick="toggleAp(${i})" style="cursor:pointer">
+        <div>
+          <div class="wl-ssid">${ap.ssid}</div>
+          <div class="wl-bssid">${ap.bssid} | CH${ap.channel} | ${ap.encryption}</div>
+        </div>
+        <div style="font-family:var(--mono); font-size:0.75rem; color:var(--muted)">
+          ${ap.rssi} dBm
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function toggleAp(i) {
+    const ap = scannedAps[i];
+    const el = document.getElementById(`ap-${i}`);
+    if (selectedBssids.has(ap.bssid)) {
+      selectedBssids.delete(ap.bssid);
+      el.style.borderColor = 'var(--border)';
+    } else {
+      selectedBssids.add(ap.bssid);
+      el.style.borderColor = 'var(--accent)';
+    }
+  }
+
+  // ============================================
+  // Monitor control
+  // ============================================
+  async function doStart() {
+    const body = {
+      target_bssids: selectedBssids.size > 0 ? [...selectedBssids] : null
+    };
+
+    try {
+      await fetch('/api/monitor/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      lastAlertCount = 0;
+      document.getElementById('alertFeed').innerHTML =
+        '<div class="empty-msg">Dang giam sat... Cho alert hien thi.</div>';
+      pollStatus();
+    } catch(e) {
+      alert('Start failed: ' + e.message);
+    }
+  }
+
+  async function doStop() {
+    await fetch('/api/monitor/stop', { method: 'POST' });
+    pollStatus();
+  }
+
+  async function clearLog() {
+    if (!confirm('Xoa toan bo log file?')) return;
+    await fetch('/api/alerts/log', { method: 'DELETE' });
+    document.getElementById('logFeed').innerHTML =
+      '<div class="empty-msg">Log da duoc xoa.</div>';
+  }
+
+  // ============================================
+  // Alert rendering
+  // ============================================
+  function renderAlerts(alerts) {
+    const el = document.getElementById('alertFeed');
+    if (!alerts.length) {
+      el.innerHTML = '<div class="empty-msg">Chua co alert.</div>';
+      return;
+    }
+    el.innerHTML = alerts.map(a => alertHtml(a)).join('');
+  }
+
+  function alertHtml(a) {
+    const isRogue = a.event_type === 'rogue_ap_detected';
+    const cls = isRogue ? 'rogue' : 'deauth';
+    const typeLabel = isRogue
+      ? '<span style="color:var(--danger)">🚨 ROGUE AP DETECTED</span>'
+      : '<span style="color:var(--warn)">⚡ DEAUTH ATTACK</span>';
+    const sev = `<span class="badge badge-${a.severity === 'high' ? 'danger' : 'warn'}">${a.severity?.toUpperCase()}</span>`;
+
+    let details = '';
+    if (isRogue) {
+      details = `
+        SSID: <span class="mono">${a.ssid}</span><br>
+        Legit BSSID: <span class="mono">${a.legit_bssid}</span><br>
+        Detected: <span class="mono" style="color:var(--danger)">${a.detected_bssid}</span>
+        | CH: ${a.channel} | RSSI: ${a.rssi} dBm | Sim: ${a.ssid_similarity}
+      `;
+    } else {
+      details = `
+        Target: <span class="mono">${a.target_bssid}</span>
+        SSID: <span class="mono">${a.ssid || 'Unknown'}</span><br>
+        <span style="color:var(--warn)">${a.frame_count} frames</span>
+        trong ${a.window_seconds}s (ngưỡng: ${a.threshold})
+      `;
+    }
+
+    return `
+      <div class="alert-item ${cls}">
+        <div class="alert-header">
+          <div>${typeLabel} ${sev}</div>
+          <div class="alert-time">${a.timestamp}</div>
+        </div>
+        <div class="alert-details">${details}</div>
+      </div>
+    `;
+  }
+
+  // ============================================
+  // Log
+  // ============================================
+  async function loadLog() {
+    const filter = document.getElementById('logFilter').value;
+    const url = '/api/alerts/log?limit=100' + (filter ? `&event_type=${filter}` : '');
+
+    try {
+      const r = await fetch(url);
+      const d = await r.json();
+      const el = document.getElementById('logFeed');
+
+      if (!d.alerts.length) {
+        el.innerHTML = '<div class="empty-msg">Khong co log.</div>';
+        return;
+      }
+      el.innerHTML = d.alerts.map(a => alertHtml(a)).join('');
+    } catch(e) {
+      console.warn('Load log failed', e);
+    }
+  }
+
+  // ============================================
+  // Whitelist
+  // ============================================
+  async function loadWhitelist() {
+    const r = await fetch('/api/whitelist');
+    const d = await r.json();
+    renderWhitelist(d.whitelist || []);
+  }
+
+  function renderWhitelist(list) {
+    const el = document.getElementById('whitelistList');
+    if (!list.length) {
+      el.innerHTML = '<div class="empty-msg">Chua co AP trong whitelist.</div>';
+      return;
+    }
+    el.innerHTML = list.map(ap => `
+      <div class="wl-item">
+        <div>
+          <div class="wl-ssid">${ap.ssid}</div>
+          <div class="wl-bssid">${ap.bssid} | CH${ap.channel || '?'} | ${ap.encryption || ''}</div>
+        </div>
+        <button class="wl-del" onclick="delWhitelist('${ap.bssid}')">✕</button>
+      </div>
+    `).join('');
+  }
+
+  async function addWhitelist() {
+    const ssid = document.getElementById('wlSsid').value.trim();
+    const bssid = document.getElementById('wlBssid').value.trim();
+    const channel = parseInt(document.getElementById('wlChannel').value) || 0;
+    const encryption = document.getElementById('wlEnc').value;
+    const note = document.getElementById('wlNote').value.trim();
+
+    if (!ssid || !bssid) {
+      alert('SSID va BSSID la bat buoc.');
+      return;
+    }
+
+    try {
+      const r = await fetch('/api/whitelist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ssid, bssid, channel, encryption, note }),
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        alert('Loi: ' + (err.detail || r.status));
+        return;
+      }
+      ['wlSsid','wlBssid','wlChannel','wlNote'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      loadWhitelist();
+    } catch(e) {
+      alert('Error: ' + e.message);
+    }
+  }
+
+  async function delWhitelist(bssid) {
+    if (!confirm(`Xoa ${bssid} khoi whitelist?`)) return;
+    await fetch(`/api/whitelist/${encodeURIComponent(bssid)}`, { method: 'DELETE' });
+    loadWhitelist();
+  }
+</script>
+</body>
+</html>

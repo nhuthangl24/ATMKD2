@@ -1,0 +1,16 @@
+[
+  {
+    "ssid": "Lab-WiFi",
+    "bssid": "AA:BB:CC:11:22:33",
+    "channel": 6,
+    "encryption": "WPA2",
+    "note": "Router chinh phong lab"
+  },
+  {
+    "ssid": "Lab-WiFi-5G",
+    "bssid": "AA:BB:CC:11:22:34",
+    "channel": 36,
+    "encryption": "WPA2",
+    "note": "Router chinh phong lab bang tan 5GHz"
+  }
+]
